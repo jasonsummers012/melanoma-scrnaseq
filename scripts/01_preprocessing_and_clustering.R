@@ -1,9 +1,9 @@
 # ===============================================================================
-# Single-Cell RNA-seq Analysis: Human Melanoma Dataset
+# Single-Cell RNA-seq Analysis: Human Breast Cancer Dataset
 # Author: Jason Summers
 # Date: 6/27/2025
 # Description: Comprehensive preprocessing, quality control, and clustering analysis 
-#              of 10k melanoma cells using Seurat workflow
+#              of 10k breast cancer cells using Seurat workflow
 # ===============================================================================
 
 # Load required libraries
@@ -31,19 +31,19 @@ dir.create(FIGURES_DIR, showWarnings = FALSE, recursive = TRUE)
 # DATA LOADING AND INITIAL SETUP
 # ===============================================================================
 
-cat("Loading melanoma dataset...\n")
-melanoma_data <- Read10X_h5(file.path(DATA_DIR, "sc5p_v2_hs_melanoma_10k_filtered_feature_bc_matrix.h5"))
+cat("Loading breast cancer dataset...\n")
+breast_cancer_data <- Read10X(data.dir = file.path(DATA_DIR, "raw_feature_bc_matrix"))
 
 # Create Seurat object with initial filtering
-melanoma <- CreateSeuratObject(
-  counts = melanoma_data,
-  project = "Melanoma_10X",
+breast_cancer <- CreateSeuratObject(
+  counts = breast_cancer_data,
+  project = "breast_cancer_10X",
   min.cells = 3,      # Filter genes expressed in < 3 cells
   min.features = 200  # Filter cells with < 200 genes
 )
 
 cat(sprintf("Initial dataset: %d cells x %d genes\n", 
-            ncol(melanoma), nrow(melanoma)))
+            ncol(breast_cancer), nrow(breast_cancer)))
 
 # ===============================================================================
 # QUALITY CONTROL METRICS
@@ -52,16 +52,13 @@ cat(sprintf("Initial dataset: %d cells x %d genes\n",
 cat("Calculating QC metrics...\n")
 
 # Calculate mitochondrial gene percentage
-melanoma[["percent.mt"]] <- PercentageFeatureSet(melanoma, pattern = "^MT-")
-
-# Add cell complexity (log10 genes per UMI)
-melanoma[["log10GenesPerUMI"]] <- log10(melanoma[["nFeature_RNA"]]) / log10(melanoma[["nCount_RNA"]])
+breast_cancer[["percent.mt"]] <- PercentageFeatureSet(breast_cancer, pattern = "^MT-")
 
 # Visualize QC metrics before filtering
 qc_metrics_before <- c("nFeature_RNA", "nCount_RNA", "percent.mt")
 
 vln_plot_before_qc <- VlnPlot(
-  melanoma,
+  breast_cancer,
   features = qc_metrics_before,
   ncol = 3,
   pt.size = 0.1
@@ -80,8 +77,8 @@ ggsave(
 )
 
 # Create scatter plots to identify outliers
-scatter_plot <- FeatureScatter(melanoma, feature1 = "nCount_RNA", feature2 = "percent.mt") +
-  FeatureScatter(melanoma, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+scatter_plot <- FeatureScatter(breast_cancer, feature1 = "nCount_RNA", feature2 = "percent.mt") +
+  FeatureScatter(breast_cancer, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
 
 ggsave(
   file.path(FIGURES_DIR, "01_feature_scatter_before_filtering.png"),
@@ -101,25 +98,25 @@ cat("Applying quality control filters...\n")
 # Define filtering thresholds
 min_features <- 200
 max_features <- 6000
-max_mt_percent <- 10
+max_mt_percent <- 25
 
 # Apply filters
-melanoma_filtered <- subset(
-  melanoma,
+breast_cancer_filtered <- subset(
+  breast_cancer,
   subset = nFeature_RNA > min_features & 
     nFeature_RNA < max_features & 
     percent.mt < max_mt_percent
 )
 
 cat(sprintf("After filtering: %d cells x %d genes\n", 
-            ncol(melanoma_filtered), nrow(melanoma_filtered)))
+            ncol(breast_cancer_filtered), nrow(breast_cancer_filtered)))
 cat(sprintf("Removed %d cells (%.1f%%)\n", 
-            ncol(melanoma) - ncol(melanoma_filtered),
-            100 * (ncol(melanoma) - ncol(melanoma_filtered)) / ncol(melanoma)))
+            ncol(breast_cancer) - ncol(breast_cancer_filtered),
+            100 * (ncol(breast_cancer) - ncol(breast_cancer_filtered)) / ncol(breast_cancer)))
 
 # Visualize QC metrics after filtering
 vln_plot_after_qc <- VlnPlot(
-  melanoma_filtered,
+  breast_cancer_filtered,
   features = qc_metrics_before,
   ncol = 3,
   pt.size = 0.1
@@ -137,8 +134,8 @@ ggsave(
 )
 
 # Update main object
-melanoma <- melanoma_filtered
-rm(melanoma_filtered)
+breast_cancer <- breast_cancer_filtered
+rm(breast_cancer_filtered)
 
 # ===============================================================================
 # NORMALIZATION AND FEATURE SELECTION
@@ -147,8 +144,8 @@ rm(melanoma_filtered)
 cat("Normalizing data...\n")
 
 # Log-normalize the data
-melanoma <- NormalizeData(
-  melanoma,
+breast_cancer <- NormalizeData(
+  breast_cancer,
   normalization.method = "LogNormalize",
   scale.factor = 10000,
   verbose = FALSE
@@ -157,18 +154,18 @@ melanoma <- NormalizeData(
 cat("Finding variable features...\n")
 
 # Identify highly variable features
-melanoma <- FindVariableFeatures(
-  melanoma,
+breast_cancer <- FindVariableFeatures(
+  breast_cancer,
   selection.method = "vst",
   nfeatures = 2000,
   verbose = FALSE
 )
 
 # Get top 10 most variable genes for labeling
-top10_variable <- head(VariableFeatures(melanoma), 10)
+top10_variable <- head(VariableFeatures(breast_cancer), 10)
 
 # Plot variable features
-variable_features_plot <- VariableFeaturePlot(melanoma) +
+variable_features_plot <- VariableFeaturePlot(breast_cancer) +
   ggtitle("Highly Variable Genes (Top 2000)") +
   theme(plot.title = element_text(hjust = 0.5))
 
@@ -195,23 +192,23 @@ ggsave(
 cat("Scaling data...\n")
 
 # Scale data for PCA
-melanoma <- ScaleData(
-  melanoma,
-  features = rownames(melanoma),
+breast_cancer <- ScaleData(
+  breast_cancer,
+  features = rownames(breast_cancer),
   verbose = FALSE
 )
 
 cat("Running PCA...\n")
 
 # Perform PCA
-melanoma <- RunPCA(
-  melanoma,
-  features = VariableFeatures(melanoma),
+breast_cancer <- RunPCA(
+  breast_cancer,
+  features = VariableFeatures(breast_cancer),
   verbose = FALSE
 )
 
 # Visualize PCA results
-pca_dim_plot <- DimPlot(melanoma, reduction = "pca") +
+pca_dim_plot <- DimPlot(breast_cancer, reduction = "pca") +
   ggtitle("PCA: PC1 vs PC2") +
   theme(plot.title = element_text(hjust = 0.5))
 
@@ -233,7 +230,7 @@ png(
   res = 300
 )
 DimHeatmap(
-  melanoma,
+  breast_cancer,
   dims = 1:12,
   cells = 500,
   balanced = TRUE,
@@ -243,7 +240,7 @@ DimHeatmap(
 dev.off()
 
 # Determine dimensionality with elbow plot
-elbow_plot <- ElbowPlot(melanoma, ndims = 30) +
+elbow_plot <- ElbowPlot(breast_cancer, ndims = 30) +
   ggtitle("PCA Elbow Plot") +
   theme(plot.title = element_text(hjust = 0.5)) +
   geom_vline(xintercept = 15, linetype = "dashed", color = "red", alpha = 0.7)
@@ -266,22 +263,22 @@ cat("Performing clustering analysis...\n")
 # Build SNN graph and find clusters
 n_pcs <- 15  # Based on elbow plot
 
-melanoma <- FindNeighbors(
-  melanoma,
+breast_cancer <- FindNeighbors(
+  breast_cancer,
   dims = 1:n_pcs,
   verbose = FALSE
 )
 
 # Perform clustering at resolution 0.5
-melanoma <- FindClusters(
-  melanoma,
+breast_cancer <- FindClusters(
+  breast_cancer,
   resolution = 0.5,
   random.seed = 12,
   verbose = FALSE
 )
 
 cat(sprintf("Found %d clusters at resolution 0.5\n", 
-            length(unique(Idents(melanoma)))))
+            length(unique(Idents(breast_cancer)))))
 
 # ===============================================================================
 # DIMENSIONALITY REDUCTION - UMAP
@@ -290,8 +287,8 @@ cat(sprintf("Found %d clusters at resolution 0.5\n",
 cat("Running UMAP...\n")
 
 # Run UMAP
-melanoma <- RunUMAP(
-  melanoma,
+breast_cancer <- RunUMAP(
+  breast_cancer,
   dims = 1:n_pcs,
   seed.use = 12,
   verbose = FALSE
@@ -299,7 +296,7 @@ melanoma <- RunUMAP(
 
 # Create UMAP plot
 umap_clusters <- DimPlot(
-  melanoma,
+  breast_cancer,
   reduction = "umap",
   label = TRUE,
   label.size = 6,
@@ -325,7 +322,7 @@ ggsave(
 cat("Saving processed Seurat object...\n")
 
 # Save the processed Seurat object
-saveRDS(melanoma, file = file.path(RESULTS_DIR, "melanoma_processed.rds"))
+saveRDS(breast_cancer, file = file.path(RESULTS_DIR, "breast_cancer_processed.rds"))
 
 # Save session info
 writeLines(capture.output(sessionInfo()), 
@@ -335,13 +332,13 @@ writeLines(capture.output(sessionInfo()),
 summary_stats <- data.frame(
   Metric = c("Initial cells", "Initial genes", "Cells after QC", "Genes after filtering",
              "Highly variable genes", "PCs used", "Final clusters"),
-  Value = c(ncol(Read10X_h5(file.path(DATA_DIR, "sc5p_v2_hs_melanoma_10k_filtered_feature_bc_matrix.h5"))),
-            nrow(Read10X_h5(file.path(DATA_DIR, "sc5p_v2_hs_melanoma_10k_filtered_feature_bc_matrix.h5"))),
-            ncol(melanoma),
-            nrow(melanoma),
-            length(VariableFeatures(melanoma)),
+  Value = c(ncol(Read10X(data.dir = "data/raw_feature_bc_matrix/")),
+            nrow(Read10X(data.dir = "data/raw_feature_bc_matrix/")),
+            ncol(breast_cancer),
+            nrow(breast_cancer),
+            length(VariableFeatures(breast_cancer)),
             n_pcs,
-            length(unique(Idents(melanoma))))
+            length(unique(Idents(breast_cancer))))
 )
 
 write.csv(summary_stats, 
@@ -351,4 +348,4 @@ write.csv(summary_stats,
 cat("\n=== ANALYSIS COMPLETE ===\n")
 cat("Results saved to:", RESULTS_DIR, "\n")
 cat("Figures saved to:", FIGURES_DIR, "\n")
-cat("Processed Seurat object:", file.path(RESULTS_DIR, "melanoma_processed.rds"), "\n")
+cat("Processed Seurat object:", file.path(RESULTS_DIR, "breast_cancer_processed.rds"), "\n")

@@ -1,8 +1,8 @@
 "Metric","Value"
-"Initial cells",8499
+"Initial cells",2049493
 "Initial genes",36601
-"Cells after QC",7904
-"Genes after filtering",21743
+"Cells after QC",3122
+"Genes after filtering",22914
 "Highly variable genes",2000
 "PCs used",15
-"Final clusters",14
+"Final clusters",10
